@@ -70,6 +70,6 @@ Thank you for your interest in contributing! This repository is primarily a pers
 
 > ⚠️ **Note:** No active exploit code should be included for production systems unless it is fully safe, legal, and educational. This is strictly for research and learning purposes.
 
-```
+I do not have a twitter.com / X.com account at all They keep banning me so I'm not making another account my only discord is clumsybeats all others are in no way shape or form related to me.
 
 ---
