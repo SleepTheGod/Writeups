@@ -6,9 +6,7 @@ Techniques, Exploitation, and Defensive Mitigation**
 *A thesis submitted in partial fulfillment of the requirements for the degree of  
 Master of Science in Information Technology*
 
-Author: [Your Name]  
-Supervisor: [Supervisor Name]  
-Date: [Submission Date]
+Author: Taylor Christian Newsome
 
 ---
 
