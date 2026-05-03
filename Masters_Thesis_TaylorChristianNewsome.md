@@ -21,7 +21,7 @@ binary exploitation, control‑flow integrity, ASLR bypass, automated exploit ge
 
 ## Acknowledgements
 
-*[Placeholder for personal acknowledgements, supervisor, lab, funding.]*
+*[Taylor Christian Newsome.]*
 
 ---
 
