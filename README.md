@@ -8,7 +8,7 @@
 If you discover any vulnerability in any of the projects documented here:
 
 1. **Do NOT publicly disclose it**.
-2. Contact me directly at: [your-email@example.com] or open a **private GitHub security report**.
+2. Contact me directly at: [sleepraps@gmail.com] or open a **private GitHub security report**.
 3. Provide:
    - A detailed description of the issue
    - Steps to reproduce
