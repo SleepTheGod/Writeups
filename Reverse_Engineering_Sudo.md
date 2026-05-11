@@ -1,6 +1,3 @@
-
-
-
 # Reverse Engineering Report: `/usr/bin/sudo` (radare2 Analysis Snapshot)
 
 ## 1. Binary Overview
