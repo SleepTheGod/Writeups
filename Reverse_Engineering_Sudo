@@ -1,0 +1,321 @@
+
+
+
+# Reverse Engineering Report: `/usr/bin/sudo` (radare2 Analysis Snapshot)
+
+## 1. Binary Overview
+
+The analyzed binary is a modern GNU/Linux `sudo` build compiled as 
+
+* **Architecture:** x86-64 ELF
+* **Linking:** dynamically linked
+* **Hardening features:**
+
+  * PIE (position independent executable)
+  * Stack canaries (`__stack_chk_fail`)
+  * RELRO + GOT usage
+* **Design model:** modular + plugin-based (sudoers + PAM + SELinux hooks)
+
+Key observation: this is not a monolithic binary; it is a **core dispatcher for multiple policy and authentication plugins**.
+
+---
+
+## 2. Entry Point Analysis
+
+### `entry0 (0x95b0)`
+
+This is a standard glibc startup stub 
+
+* Sets up stack alignment
+* Initializes arguments
+* Calls:
+
+```text
+__libc_start_main(main, ...)
+```
+
+### Key instruction 
+
+```asm
+lea rdi, [main] → 0x7030
+call __libc_start_main
+```
+
+**Interpretation** 
+
+* `main` is the true control entry
+* `entry0` is boilerplate runtime bootstrap
+
+---
+
+## 3. Main Function (0x7030)
+
+### Size 
+
+Large (~9500 bytes), indicating orchestration logic rather than simple procedural code.
+
+### Role 
+
+`main()` acts as the **central policy dispatcher**.
+
+It coordinates 
+
+1. Environment setup
+2. Configuration parsing
+3. Plugin loading
+4. Authentication pipeline
+5. Execution handoff (`execve` / `fexecve`)
+
+---
+
+## 4. Function Landscape (afl output summary)
+
+Your function table shows 
+
+* Hundreds of functions (`fcn.*`)
+* Heavy use of modular internal libraries
+* Large subsystems (~3k–8k byte functions)
+
+### Notable large components 
+
+| Function       | Likely Role                          |
+| -------------- | ------------------------------------ |
+| `fcn.00031310` | Core policy / plugin orchestration   |
+| `fcn.0002ede0` | Execution/session control logic      |
+| `fcn.0002fbe0` | Authentication or privilege handling |
+| `fcn.00029aa0` | Environment or session setup         |
+
+These large functions are typically 
+
+* policy evaluation
+* sudoers rule processing
+* privilege transition coordination
+
+---
+
+## 5. Import Table Analysis (Critical Insight)
+
+Your imports reveal the architecture clearly.
+
+---
+
+### 5.1 Authentication & Identity
+
+Key APIs 
+
+* `getpwnam`
+* `getuid / geteuid`
+* `getgroups`
+* `setresuid`
+* `setgid / setegid`
+
+**Meaning:**
+
+* User identity resolution
+* Privilege boundary transitions
+* Group membership validation
+
+---
+
+### 5.2 PAM Integration
+
+Indirect but implied via 
+
+* `pam_*` dependency chain (not directly shown but standard sudo build behavior)
+
+This indicates:
+
+> Authentication is delegated to PAM stack, not hardcoded logic.
+
+---
+
+### 5.3 SELinux / Security Context
+
+Detected functions 
+
+* `security_getenforce`
+* `setexeccon`
+* `context_*`
+* `setfilecon`
+
+**Meaning:**
+
+* sudo respects SELinux contexts
+* execution may be policy-restricted beyond Unix permissions
+
+---
+
+### 5.4 Execution Layer
+
+Critical syscall-level exports 
+
+* `execve`
+* `fexecve`
+* `execle` (indirect via libc)
+* `chroot`
+
+**Meaning:**
+This is the final execution stage where 
+
+> privilege escalation becomes process replacement
+
+---
+
+### 5.5 Privilege Transition Layer
+
+Key calls 
+
+* `setuid`
+* `seteuid`
+* `setresuid`
+* `setgid`
+
+This is the **security boundary layer**.
+
+---
+
+## 6. Control Flow Architecture
+
+Based on entry + function map 
+
+### High-level execution pipeline 
+
+```
+entry0
+  ↓
+main
+  ↓
+configuration loader (sudo_conf_read_v1)
+  ↓
+plugin loader (sudo_dso_load_v1)
+  ↓
+policy evaluation (sudoers plugin)
+  ↓
+authentication (PAM / system checks)
+  ↓
+privilege transition (setresuid / setuid)
+  ↓
+execution (execve / fexecve)
+```
+
+---
+
+## 7. Key Decision Point (Critical Insight)
+
+The most important logic in sudo binaries is 
+
+> **The policy decision branch that determines whether execution is allowed**
+
+This is not in `main` alone.
+
+It is typically inside 
+
+* sudoers plugin
+* or large fcn blocks (~0x2xxxx–0x3xxxx range)
+
+Your binary shows strong candidates 
+
+* `fcn.0002ede0`
+* `fcn.00031310`
+
+These likely contain 
+
+```
+if (policy_check(user, command) == ALLOW)
+    proceed
+else
+    deny
+```
+
+---
+
+## 8. Plugin-Based Architecture (Important)
+
+This sudo build is not static logic.
+
+It uses:
+
+* `sudo_dso_load_v1`
+* `sudo_conf_plugins_v1`
+* `sudo_dso_findsym_v1`
+
+### Interpretation:
+
+> sudo loads policy modules dynamically at runtime
+
+This means 
+
+* core binary is a dispatcher
+* actual decision logic lives in shared objects (`sudoers.so`, etc.)
+
+---
+
+## 9. Execution Security Model
+
+The security model is layered 
+
+### Layer 1: Identity
+
+* UID/GID resolution
+
+### Layer 2: Policy
+
+* sudoers rules / plugin evaluation
+
+### Layer 3: Authentication
+
+* PAM / password / tty interaction
+
+### Layer 4: Privilege transition
+
+* setresuid / setuid
+
+### Layer 5: Execution
+
+* execve/fexecve
+
+---
+
+## 10. Key Takeaways
+
+1. `main()` is not the security logic — it is orchestration.
+2. Real decision-making is in large `fcn.*` blocks and plugins.
+3. sudo is fundamentally a **policy engine + execution wrapper**.
+4. Security is enforced through 
+
+   * PAM
+   * sudoers plugin
+   * SELinux (if enabled)
+   * kernel privilege syscalls
+
+---
+
+## 11. Recommended Next Reverse Engineering Step
+
+If continuing analysis 
+
+Focus on:
+
+```bash
+s 0x31310
+pdf
+```
+
+and 
+
+```bash
+s 0x2ede0
+pdf
+```
+
+Then trace 
+
+* calls to `setresuid`
+* branches leading to `execve`
+
+That is where the real decision graph exists.
+
+
+https://tsgh.org/sudo_full.txt
+https://tsgh.org/sudo_analysis.txt
+https://tsgh.org/sudo_main.txt
