@@ -633,3 +633,6 @@ Proper random number generation requires cryptographic strength and high entropy
 
 Final Flag
 HTB{r4nd_1s_v3ry_pr3d1ct4bl3}
+<img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/70ada4dd-7adb-4be7-aac3-ce6914d6d9b8" />
+<img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/6aa43528-992b-4930-abe6-b85d13dfdaf1" />
+
